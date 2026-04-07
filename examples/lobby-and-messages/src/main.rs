@@ -43,8 +43,17 @@ async fn main() {
     let (tx_lobby_enter, rx_lobby_enter) = mpsc::channel::<LobbyEnter>();
     let (tx_chat_update, rx_chat_update) = mpsc::channel::<LobbyChatUpdate>();
     let (tx_chat_msg, rx_chat_msg) = mpsc::channel::<LobbyChatMsg>();
+    let (tx_join_requested, rx_join_requested) = mpsc::channel::<GameLobbyJoinRequested>();
 
     // --- Register callbacks ---
+
+    // Handle join requests from the Steam friends list UI.
+    // When a player clicks "Join Game" on a friend, this fires on the joiner's side.
+    // We must manually call join_lobby() in response.
+    let _cb_join_requested = client.register_callback(move |ev: GameLobbyJoinRequested| {
+        let _ = tx_join_requested.send(ev);
+    });
+
     let _cb_lobby_enter = client.register_callback(move |ev: LobbyEnter| {
         let _ = tx_lobby_enter.send(ev);
     });
@@ -82,6 +91,16 @@ async fn main() {
                 chat_log: vec![format!("Lobby created: {}", lobby_id.raw())],
                 chat_input: String::new(),
             });
+        }
+
+        // Join requested via Steam friends list UI — must call join_lobby manually
+        if let Ok(ev) = rx_join_requested.try_recv() {
+            println!(
+                "[Lobby] Join requested for lobby {} (invited by {})",
+                ev.lobby_steam_id.raw(),
+                ev.friend_steam_id.raw()
+            );
+            matchmaking.join_lobby(ev.lobby_steam_id, |_| {});
         }
 
         // Lobby entered (for both host after creation and joiner)
