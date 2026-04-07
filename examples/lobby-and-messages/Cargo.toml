@@ -4,5 +4,5 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-steamworks = { path = "../.." }
+steamworks = "0.12.2"
 macroquad = "0.4"
